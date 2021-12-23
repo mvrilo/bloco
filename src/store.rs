@@ -1,7 +1,7 @@
-use crate::blob::Blob;
+use crate::blob::{Blob, Hash};
 use crate::Result;
 
-pub trait Store: Default + Clone {
-    fn get(&mut self, hash: [u8; 32]) -> Option<Blob>;
-    fn put(&mut self, data: Vec<u8>) -> Result<[u8; 32]>;
+pub trait Store: Clone {
+    fn get(&mut self, hash: Hash) -> Option<Blob>;
+    fn put(&mut self, blob: Blob) -> Result<()>;
 }

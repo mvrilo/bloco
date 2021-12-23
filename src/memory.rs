@@ -1,6 +1,8 @@
-use crate::blob::Blob;
+use crate::blob::{Blob, Hash};
 use crate::store::Store;
-use crate::{BlobMap, Result};
+use crate::Result;
+
+pub type BlobMap = std::collections::BTreeMap<Hash, Blob>;
 
 #[derive(Debug, Clone, Default)]
 pub struct MemoryStore {
@@ -8,14 +10,13 @@ pub struct MemoryStore {
 }
 
 impl Store for MemoryStore {
-    fn get(&mut self, hash: [u8; 32]) -> Option<Blob> {
+    fn get(&mut self, hash: Hash) -> Option<Blob> {
         self.db.get(&hash).map(|blob| blob.clone())
     }
 
-    fn put(&mut self, data: Vec<u8>) -> Result<[u8; 32]> {
-        let hash: [u8; 32] = blake3::hash(&data).into();
+    fn put(&mut self, blob: Blob) -> Result<()> {
         let db = &mut self.db;
-        db.insert(hash, data.into());
-        Ok(hash)
+        db.insert(blob.hash, blob);
+        Ok(())
     }
 }

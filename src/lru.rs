@@ -1,4 +1,4 @@
-use crate::blob::Blob;
+use crate::blob::{Blob, Hash};
 use crate::store::Store;
 use crate::Result;
 use uluru::LRUCache;
@@ -9,14 +9,13 @@ pub struct LRUStore<const N: usize> {
 }
 
 impl<const N: usize> Store for LRUStore<N> {
-    fn get(&mut self, hash: [u8; 32]) -> Option<Blob> {
-        self.db.find(|x| x.hash() == hash).map(|blob| blob.clone())
+    fn get(&mut self, hash: Hash) -> Option<Blob> {
+        self.db.find(|x| x.hash == hash).map(|blob| blob.clone())
     }
 
-    fn put(&mut self, data: Vec<u8>) -> Result<[u8; 32]> {
-        let hash: [u8; 32] = blake3::hash(&data).into();
+    fn put(&mut self, blob: Blob) -> Result<()> {
         let db = &mut self.db;
-        db.insert(data.into());
-        Ok(hash)
+        db.insert(blob);
+        Ok(())
     }
 }
