@@ -1,17 +1,17 @@
-use crate::blobstore::{lru::LRUBlobStore, BlobStore};
+use crate::{lru::LRUStore, store::Store};
 
 #[derive(Debug, Clone)]
-pub struct Bloco<B: BlobStore, const CACHE_SIZE: usize> {
+pub struct Bloco<B: Store, const CACHE_SIZE: usize> {
     pub blobstore: B,
-    pub cache: LRUBlobStore<CACHE_SIZE>,
+    pub cache: LRUStore<CACHE_SIZE>,
 }
 
 impl<B, const CACHE_SIZE: usize> Bloco<B, CACHE_SIZE>
 where
-    B: BlobStore,
+    B: Store,
 {
     pub fn new(blobstore: B) -> Self {
-        let cache = LRUBlobStore::<CACHE_SIZE>::default();
+        let cache = LRUStore::<CACHE_SIZE>::default();
         Bloco { blobstore, cache }
     }
 }

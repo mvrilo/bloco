@@ -1,13 +1,13 @@
 use crate::blob::Blob;
-use crate::blobstore::{BlobMap, BlobStore};
-use crate::Result;
+use crate::store::Store;
+use crate::{BlobMap, Result};
 
 #[derive(Debug, Clone, Default)]
-pub struct MemoryBlobStore {
+pub struct MemoryStore {
     db: BlobMap,
 }
 
-impl BlobStore for MemoryBlobStore {
+impl Store for MemoryStore {
     fn get(&mut self, hash: [u8; 32]) -> Option<Blob> {
         self.db.get(&hash).map(|blob| blob.clone())
     }
