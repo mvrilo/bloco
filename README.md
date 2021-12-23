@@ -1,2 +1,3 @@
 # bloco
-content-addressable object store
+
+minimalist content-addressable object store

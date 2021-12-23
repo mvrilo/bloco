@@ -1,13 +1,12 @@
-use bloco::{file::FileStore, Blob, Bloco, Store};
+use bloco::{Blob, Bloco, Store};
 
 pub fn main() {
-    let mut bloco = Bloco::<_, 100>::new(FileStore::new("/tmp/bloco-test"));
+    let mut bloco = Bloco::<100>::new("/tmp/bloco-test");
 
     let file_a: Blob = b"hey".to_vec().into();
-    let hash = file_a.hash.clone();
-    bloco.put(file_a).unwrap();
+    bloco.put(file_a.clone()).unwrap();
 
-    let content = bloco.get(hash).unwrap();
+    let content = bloco.get(file_a.hash).unwrap();
     println!(
         "contents from file_a: {}",
         String::from_utf8(content.data).unwrap()
