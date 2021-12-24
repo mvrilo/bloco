@@ -8,6 +8,10 @@ impl Hash {
     pub fn to_vec(self) -> Vec<u8> {
         self.0.to_vec()
     }
+
+    pub fn as_hex(self) -> String {
+        hex::encode(self.to_vec())
+    }
 }
 
 impl From<[u8; 32]> for Hash {

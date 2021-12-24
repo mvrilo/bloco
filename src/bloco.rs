@@ -3,29 +3,42 @@ use crate::Result;
 use crate::{file::FileStore, lru::LRUStore, store::Store};
 
 #[derive(Debug, Clone)]
-pub struct Bloco<'a, const CACHE_SIZE: usize> {
-    pub root: FileStore<'a>,
+pub struct Bloco<R, const CACHE_SIZE: usize> {
+    pub root: R,
     pub cache: LRUStore<CACHE_SIZE>,
 }
 
-impl<'a, const CACHE_SIZE: usize> Bloco<'a, CACHE_SIZE> {
-    pub fn new(root: &'a str) -> Self {
-        let root = FileStore::new(root);
-        let cache = LRUStore::<CACHE_SIZE>::default();
-        Bloco { root, cache }
-    }
-}
-
-impl<'a, const CACHE_SIZE: usize> Store for Bloco<'a, CACHE_SIZE> {
-    fn get(&mut self, hash: Hash) -> Option<Blob> {
-        match self.cache.get(hash) {
-            Some(data) => Some(data),
-            None => self.root.get(hash),
+impl<R, const CACHE_SIZE: usize> Bloco<R, CACHE_SIZE>
+where
+    R: Store,
+{
+    pub fn new(root: R) -> Bloco<R, CACHE_SIZE> {
+        Bloco {
+            root,
+            cache: LRUStore::<CACHE_SIZE>::default(),
         }
     }
 
-    fn put(&mut self, data: Blob) -> Result<()> {
-        let blob: Blob = data.into();
+    pub fn from_dir(root: &str) -> Bloco<FileStore, CACHE_SIZE> {
+        Bloco::new(FileStore::new(root))
+    }
+}
+
+impl<R, const CACHE_SIZE: usize> Store for Bloco<R, CACHE_SIZE>
+where
+    R: Store,
+{
+    fn get(&mut self, hash: Hash) -> Option<Blob> {
+        match self.cache.get(hash) {
+            Some(data) => Some(data),
+            None => {
+                // get fs file
+                self.root.get(hash)
+            }
+        }
+    }
+
+    fn put(&mut self, blob: Blob) -> Result<()> {
         self.root.put(blob.clone())?;
         self.cache.put(blob)?;
         Ok(())
@@ -38,10 +51,18 @@ pub mod test {
 
     #[test]
     fn test_store() {
-        let mut bloco = Bloco::<100>::new("/tmp/bloco-cargo-test");
-        let file_a: Blob = b"hello".to_vec().into();
-        bloco.put(file_a.clone()).unwrap();
-        let blob_a = bloco.get(file_a.hash).unwrap();
-        assert_eq!(file_a.hash, blob_a.hash);
+        let mut bloco = Bloco::<FileStore, 100>::from_dir("/tmp/bloco-cargo-test");
+
+        let blob1: Blob = b"hello".to_vec().into();
+        bloco.put(blob1.clone()).unwrap();
+
+        let blob2: Blob =
+            std::fs::File::open(format!("/tmp/bloco-cargo-test/{}", blob1.hash.as_hex()))
+                .unwrap()
+                .into();
+        assert_eq!(blob1, blob2);
+
+        let blob3 = bloco.get(blob1.hash).unwrap();
+        assert_eq!(blob1, blob3);
     }
 }

@@ -28,8 +28,7 @@ impl<'a> Store for FileStore<'a> {
     }
 
     fn put(&mut self, blob: Blob) -> Result<()> {
-        let name = hex::encode(blob.hash.to_vec());
-        let path = Path::new(self.dir).join(name);
+        let path = Path::new(self.dir).join(blob.hash.as_hex());
         let mut file = fs::File::create(path)?;
         file.write_all(&blob.data)?;
         Ok(())
