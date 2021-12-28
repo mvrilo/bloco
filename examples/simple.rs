@@ -1,8 +1,7 @@
-use bloco::{indexer::SledIndexer, Bloco, Core, FileStore, LRUStore};
+use bloco::Core;
 
 pub fn main() {
-    let bloco =
-        &mut Bloco::<FileStore<'_>, LRUStore<1000>, SledIndexer>::from_dir("/tmp/bloco-test");
+    let mut bloco = bloco::Default::<100>::from_dir("/tmp/bloco-cargo-test".into());
     let data = b"hey".to_vec();
     let now = std::time::Instant::now();
     let fileref = bloco.put_data(data.clone(), "test.txt".into()).unwrap();

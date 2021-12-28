@@ -1,4 +1,5 @@
 pub mod btree;
+pub mod cachedfile;
 pub mod file;
 pub mod lru;
 

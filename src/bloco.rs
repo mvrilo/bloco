@@ -1,45 +1,36 @@
 use crate::{
     indexer::{Indexer, SledIndexer},
     store::Store,
-    Blob, Core, FileStore, LRUStore, Ref, Result,
+    Blob, CachedFileStore, Core, Ref, Result,
 };
 
-pub type Default<'a, const N: usize> = Bloco<FileStore<'a>, LRUStore<N>, SledIndexer>;
+pub type Default<const N: usize> = Bloco<CachedFileStore<N>, SledIndexer>;
 
 #[derive(Debug, Clone)]
-pub struct Bloco<S, C, I> {
-    pub blobstore: S,
-    pub blobcache: C,
+pub struct Bloco<S, I> {
+    pub store: S,
     pub indexer: I,
 }
 
-impl<S, C, I> Bloco<S, C, I>
+impl<S, I> Bloco<S, I>
 where
     S: Store,
-    C: Store,
     I: Indexer,
 {
-    pub fn new(blobstore: S, blobcache: C, indexer: I) -> Bloco<S, C, I> {
-        Bloco {
-            blobstore,
-            blobcache,
-            indexer,
-        }
+    pub fn new(store: S, indexer: I) -> Bloco<S, I> {
+        Bloco { store, indexer }
     }
 
-    pub fn from_dir(blobstore: &str) -> Bloco<FileStore, LRUStore<100>, SledIndexer> {
-        Bloco::new(
-            FileStore::new(blobstore),
-            LRUStore::<100>::default(),
-            SledIndexer::new(blobstore),
-        )
+    pub fn from_dir(dir: String) -> Default<100> {
+        let blobsdir = format!("{}/blobs", dir);
+        let sleddir = format!("{}/sled", dir);
+        Bloco::new(CachedFileStore::new(blobsdir), SledIndexer::new(sleddir))
     }
 }
 
-impl<S, C, I> Core for Bloco<S, C, I>
+impl<S, I> Core for Bloco<S, I>
 where
     S: Store,
-    C: Store,
     I: Indexer,
 {
     fn get_ref_by_name(&mut self, name: String) -> Result<Ref> {
@@ -61,20 +52,14 @@ where
         let hash = blob.hash();
         let indexer = &mut self.indexer;
 
-        match indexer.get_ref_by_name(name.clone()) {
-            Ok(blobref) => Ok(blobref),
-            Err(_) => {
-                let blobref = Ref::new(name, size, vec![hash]);
-                indexer.put_ref(blobref.clone())?;
+        self.store.put(blob)?;
 
-                if self.blobstore.get(hash).is_none() {
-                    self.blobstore.put(blob.clone())?;
-                    self.blobcache.put(blob)?;
-                }
-
-                Ok(blobref)
-            }
-        }
+        let blobref: Ref =
+            indexer
+                .get_ref_by_name(name.clone())
+                .or(Ok(Ref::new(name, size, vec![hash])) as Result<Ref>)?;
+        indexer.put_ref(blobref.clone())?;
+        Ok(blobref)
     }
 }
 
@@ -82,30 +67,53 @@ where
 pub mod test {
     use super::*;
 
-    #[test]
-    fn test_put_data() {
+    fn bloco() -> Default<100> {
+        Default::<100>::from_dir("/tmp/bloco-cargo-test".into())
+    }
+
+    fn remove_dir() {
         #[allow(unused_must_use)]
         {
-            std::fs::remove_dir_all("/tmp/bloco-test");
+            std::fs::remove_dir_all("/tmp/bloco-cargo-test");
         }
+    }
 
-        let bloco = &mut Default::<100>::from_dir("/tmp/bloco-test");
-        let data = b"hey".to_vec();
+    fn sample_data() -> Vec<u8> {
+        b"hey".to_vec()
+    }
 
-        let ref1 = bloco.put_data(data.clone(), "a.txt".into()).unwrap();
-        assert_eq!(ref1.size, data.len() as u64);
+    #[test]
+    fn test_put_data() {
+        remove_dir();
+        let mut bloco = bloco();
+        let ref1 = bloco.put_data(sample_data(), "a.txt".into()).unwrap();
         assert_eq!(ref1.name, "a.txt");
         assert_eq!(ref1.blobs.len(), 1);
+    }
 
-        let ref2 = bloco.indexer.get_ref_by_name("a.txt".into()).unwrap();
-        assert_eq!(ref2, ref1);
+    #[test]
+    fn test_get_data() {
+        remove_dir();
+        let mut bloco = bloco();
+        let _ = bloco.put_data(sample_data(), "a.txt".into()).unwrap();
 
-        // not found
-        let ref3 = bloco.get_ref_by_name_and_bucket("a.txt".into(), "/".into());
-        assert!(ref3.is_err());
+        let ref1 = bloco.indexer.get_ref_by_name("a.txt".into());
+        assert!(ref1.is_ok());
+        let ref2 = bloco.get_ref_by_name_and_bucket("a.txt".into(), "/".into());
+        assert!(ref2.is_err());
+    }
 
+    #[test]
+    fn test_put_bucket_data() {
+        remove_dir();
+        let mut bloco = bloco();
+        let ref1 = bloco.put_data(sample_data(), "a.txt".into()).unwrap();
         bloco.put_ref_in(ref1, "/".into()).unwrap();
-        let ref4 = bloco.get_ref_by_name_and_bucket("a.txt".into(), "/".into());
-        assert!(ref4.is_ok());
+
+        let ref2 = bloco.get_ref_by_name_and_bucket("a.txt".into(), "/".into());
+        assert!(ref2.is_ok());
+
+        let ref3 = bloco.get_ref_by_name_and_bucket("a.txt".into(), "/nope".into());
+        assert!(ref3.is_err());
     }
 }
