@@ -8,7 +8,7 @@ pub struct BTreeStore {
 
 impl Store for BTreeStore {
     fn get(&mut self, hash: Hash) -> Option<Blob> {
-        self.db.get(&hash).map(|blob| blob.clone())
+        self.db.get(&hash).cloned()
     }
 
     fn put(&mut self, blob: Blob) -> Result<()> {
