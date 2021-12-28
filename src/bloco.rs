@@ -84,7 +84,7 @@ pub mod test {
 
     #[test]
     fn test_put_data() {
-        std::fs::remove_dir_all("/tmp/bloco-test").unwrap();
+        std::fs::remove_dir_all("/tmp/bloco-test");
 
         let bloco = &mut Default::<100>::from_dir("/tmp/bloco-test");
         let data = b"hey".to_vec();
