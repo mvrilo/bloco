@@ -12,12 +12,12 @@ lazy_static! {
 pub struct Ref {
     pub name: String,
     pub size: u64,
-    pub chunks: Vec<Hash>,
+    pub blobs: Vec<Hash>,
 }
 
 impl Ref {
-    pub fn new(name: String, size: u64, chunks: Vec<Hash>) -> Self {
-        Ref { name, chunks, size }
+    pub fn new(name: String, size: u64, blobs: Vec<Hash>) -> Self {
+        Ref { name, blobs, size }
     }
 
     pub fn from_vec(arr: &[u8]) -> Result<Vec<Ref>> {

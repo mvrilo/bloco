@@ -61,7 +61,7 @@ impl<'a> Store for FileStore<'a> {
 //     }
 
 //     fn put(&mut self, blob: Blob) -> Result<()> {
-//         match blob.0.chunks(N).next() {
+//         match blob.0.blobs(N).next() {
 //             Some(data) => self.filestore.put(data.into()),
 //             None => Ok(()),
 //         }

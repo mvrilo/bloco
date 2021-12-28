@@ -95,7 +95,7 @@ pub mod test {
         let ref1 = bloco.put_data(data.clone(), "a.txt".into()).unwrap();
         assert_eq!(ref1.size, data.len() as u64);
         assert_eq!(ref1.name, "a.txt");
-        assert_eq!(ref1.chunks.len(), 1);
+        assert_eq!(ref1.blobs.len(), 1);
 
         let ref2 = bloco.indexer.get_ref_by_name("a.txt".into()).unwrap();
         assert_eq!(ref2, ref1);
