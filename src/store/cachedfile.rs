@@ -21,8 +21,8 @@ impl<const N: usize> Store for CachedFileStore<N> {
         self.cache.get(hash).or_else(|| self.fs.get(hash))
     }
 
-    fn put(&mut self, blob: Blob) -> Result<()> {
-        self.fs.put(blob.clone())?;
+    fn put(&mut self, blob: &mut Blob) -> Result<()> {
+        self.fs.put(blob)?;
         self.cache.put(blob)?;
         Ok(())
     }

@@ -12,6 +12,9 @@ pub enum Error {
     #[error("database error")]
     SledError(#[from] sled::Error),
 
+    #[error("orion crypto error")]
+    UnknownCryptoError(#[from] orion::errors::UnknownCryptoError),
+
     #[error("not found")]
     NotFound,
 }

@@ -11,9 +11,9 @@ impl Store for BTreeStore {
         self.db.get(&hash).cloned()
     }
 
-    fn put(&mut self, blob: Blob) -> Result<()> {
+    fn put(&mut self, blob: &mut Blob) -> Result<()> {
         let db = &mut self.db;
-        db.insert(blob.hash(), blob);
+        db.insert(blob.hash(), blob.clone());
         Ok(())
     }
 }

@@ -25,7 +25,7 @@ impl Store for FileStore {
         }
     }
 
-    fn put(&mut self, blob: Blob) -> Result<()> {
+    fn put(&mut self, blob: &mut Blob) -> Result<()> {
         let path = Path::new(&self.dir).join(blob.hash().as_hex());
         let mut file = fs::File::create(path)?;
         file.write_all(&blob.0)?;

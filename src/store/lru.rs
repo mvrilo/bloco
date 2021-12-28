@@ -11,9 +11,9 @@ impl<const N: usize> Store for LRUStore<N> {
         self.db.find(|x| x.hash() == hash).map(|blob| blob.clone())
     }
 
-    fn put(&mut self, blob: Blob) -> Result<()> {
+    fn put(&mut self, blob: &mut Blob) -> Result<()> {
         let db = &mut self.db;
-        db.insert(blob);
+        db.insert(blob.clone());
         Ok(())
     }
 }

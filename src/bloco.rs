@@ -1,10 +1,10 @@
 use crate::{
     indexer::{Indexer, SledIndexer},
     store::Store,
-    Blob, CachedFileStore, Core, Ref, Result,
+    Blob, CachedFileStore, Core, EncryptedStore, Hash, Ref, Result,
 };
 
-pub type Default<const N: usize> = Bloco<CachedFileStore<N>, SledIndexer>;
+pub type Default<const N: usize> = Bloco<EncryptedStore<CachedFileStore<N>>, SledIndexer>;
 
 #[derive(Debug, Clone)]
 pub struct Bloco<S, I> {
@@ -21,10 +21,12 @@ where
         Bloco { store, indexer }
     }
 
-    pub fn from_dir(dir: String) -> Default<100> {
+    pub fn from_dir(secret: String, dir: String) -> Default<100> {
         let blobsdir = format!("{}/blobs", dir);
         let sleddir = format!("{}/sled", dir);
-        Bloco::new(CachedFileStore::new(blobsdir), SledIndexer::new(sleddir))
+        let store = EncryptedStore::new(secret, CachedFileStore::new(blobsdir));
+        let indexer = SledIndexer::new(sleddir);
+        Bloco::new(store, indexer)
     }
 }
 
@@ -33,6 +35,10 @@ where
     S: Store,
     I: Indexer,
 {
+    fn get_blob(&mut self, hash: Hash) -> Result<Blob> {
+        Ok(self.store.get(hash).unwrap())
+    }
+
     fn get_ref_by_name(&mut self, name: String) -> Result<Ref> {
         self.indexer.get_ref_by_name(name)
     }
@@ -48,11 +54,11 @@ where
 
     fn put_data(&mut self, data: Vec<u8>, name: String) -> Result<Ref> {
         let size = data.len() as u64;
-        let blob: Blob = data.into();
-        let hash = blob.hash();
+        let mut blob: Blob = data.into();
         let indexer = &mut self.indexer;
 
-        self.store.put(blob)?;
+        self.store.put(&mut blob)?;
+        let hash = blob.hash();
 
         let blobref: Ref =
             indexer
@@ -68,7 +74,10 @@ pub mod test {
     use super::*;
 
     fn bloco() -> Default<100> {
-        Default::<100>::from_dir("/tmp/bloco-cargo-test".into())
+        Default::<100>::from_dir(
+            "36c0dbde383816cb498c07f8ae615371".into(),
+            "/tmp/bloco-cargo-test".into(),
+        )
     }
 
     fn remove_dir() {
@@ -97,10 +106,13 @@ pub mod test {
         let mut bloco = bloco();
         let _ = bloco.put_data(sample_data(), "a.txt".into()).unwrap();
 
-        let ref1 = bloco.indexer.get_ref_by_name("a.txt".into());
-        assert!(ref1.is_ok());
+        let ref1 = bloco.indexer.get_ref_by_name("a.txt".into()).unwrap();
+        assert_eq!(ref1.blobs.len(), 1);
         let ref2 = bloco.get_ref_by_name_and_bucket("a.txt".into(), "/".into());
         assert!(ref2.is_err());
+
+        let blob = bloco.get_blob(ref1.blobs[0]).unwrap();
+        assert_eq!(blob.0, b"hey")
     }
 
     #[test]
