@@ -1,45 +1,65 @@
-use std::fs::File;
+use crate::{Hash, Result};
+use bincode::{config::Configuration, Decode, Encode};
+use lazy_static::lazy_static;
+use std::fs;
 use std::io::Read;
 
-#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Ord, PartialOrd)]
-pub struct Hash(pub [u8; 32]);
+lazy_static! {
+    static ref CONFIG: Configuration = Configuration::standard();
+}
 
-impl Hash {
-    pub fn to_vec(self) -> Vec<u8> {
-        self.0.to_vec()
+#[derive(Debug, Clone, Encode, Decode, PartialEq)]
+pub struct Ref {
+    pub name: String,
+    pub size: u64,
+    pub chunks: Vec<Hash>,
+}
+
+impl Ref {
+    pub fn new(name: String, size: u64, chunks: Vec<Hash>) -> Self {
+        Ref { name, chunks, size }
     }
 
-    pub fn as_hex(self) -> String {
-        hex::encode(self.to_vec())
+    pub fn from_vec(arr: &[u8]) -> Result<Vec<Ref>> {
+        let (rref, _): (Vec<Ref>, usize) = bincode::decode_from_slice(&arr, CONFIG.clone())?;
+        Ok(rref)
+    }
+
+    pub fn from_slice(arr: &[u8]) -> Result<Ref> {
+        let (rref, _): (Ref, usize) = bincode::decode_from_slice(&arr, CONFIG.clone())?;
+        Ok(rref)
     }
 }
 
-impl From<[u8; 32]> for Hash {
-    fn from(arr: [u8; 32]) -> Hash {
-        Hash(arr)
-    }
-}
+#[derive(Debug, Clone, Encode, Decode, PartialEq)]
+pub struct Blob(pub Vec<u8>);
 
-#[derive(Debug, Clone, Default, PartialEq)]
-pub struct Blob {
-    pub hash: Hash,
-    pub data: Vec<u8>,
+impl Blob {
+    pub fn new(data: Vec<u8>) -> Self {
+        Blob(data)
+    }
+
+    pub fn hash(&self) -> Hash {
+        blake3::hash(&self.0).into()
+    }
 }
 
 impl From<Vec<u8>> for Blob {
     fn from(data: Vec<u8>) -> Blob {
-        let orig_hash: [u8; 32] = blake3::hash(&data).into();
-        let hash: Hash = orig_hash.into();
-        Blob { hash, data }
+        Blob::new(data)
     }
 }
 
-impl From<File> for Blob {
-    fn from(mut file: File) -> Blob {
+impl From<&[u8]> for Blob {
+    fn from(arr: &[u8]) -> Blob {
+        Blob::new(arr.into())
+    }
+}
+
+impl From<fs::File> for Blob {
+    fn from(mut file: fs::File) -> Blob {
         let mut data: Vec<u8> = Vec::new();
         file.read_to_end(&mut data).unwrap();
-        let orig_hash: [u8; 32] = blake3::hash(&data).into();
-        let hash: Hash = orig_hash.into();
-        Blob { hash, data }
+        Blob::new(data)
     }
 }

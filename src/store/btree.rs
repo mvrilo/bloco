@@ -1,22 +1,19 @@
-use crate::blob::{Blob, Hash};
-use crate::store::Store;
-use crate::Result;
-
-pub type BlobMap = std::collections::BTreeMap<Hash, Blob>;
+use crate::{Blob, Hash, Result, Store};
+use std::collections::BTreeMap;
 
 #[derive(Debug, Clone, Default)]
-pub struct MemoryStore {
-    db: BlobMap,
+pub struct BTreeStore {
+    db: BTreeMap<Hash, Blob>,
 }
 
-impl Store for MemoryStore {
+impl Store for BTreeStore {
     fn get(&mut self, hash: Hash) -> Option<Blob> {
         self.db.get(&hash).map(|blob| blob.clone())
     }
 
     fn put(&mut self, blob: Blob) -> Result<()> {
         let db = &mut self.db;
-        db.insert(blob.hash, blob);
+        db.insert(blob.hash(), blob);
         Ok(())
     }
 }

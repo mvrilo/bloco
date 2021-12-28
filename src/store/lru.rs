@@ -1,6 +1,4 @@
-use crate::blob::{Blob, Hash};
-use crate::store::Store;
-use crate::Result;
+use crate::{Blob, Hash, Result, Store};
 use uluru::LRUCache;
 
 #[derive(Debug, Clone, Default)]
@@ -10,7 +8,7 @@ pub struct LRUStore<const N: usize> {
 
 impl<const N: usize> Store for LRUStore<N> {
     fn get(&mut self, hash: Hash) -> Option<Blob> {
-        self.db.find(|x| x.hash == hash).map(|blob| blob.clone())
+        self.db.find(|x| x.hash() == hash).map(|blob| blob.clone())
     }
 
     fn put(&mut self, blob: Blob) -> Result<()> {
