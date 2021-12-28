@@ -24,7 +24,7 @@ impl Indexer for SledIndexer {
         self.db
             .insert(
                 format!("r:{}", r.name),
-                bincode::encode_to_vec(&r, CONFIG.clone()).unwrap(),
+                bincode::encode_to_vec(&r, *CONFIG).unwrap(),
             )
             .unwrap();
         Ok(())
@@ -40,10 +40,10 @@ impl Indexer for SledIndexer {
     fn put_ref_in(&mut self, r: Ref, bucket: String) -> Result<()> {
         let mut refs = self.get_refs_from(bucket.clone())?;
         if refs.iter().filter(|br| r.name == br.name).count() == 0 {
-            refs.push(r.clone());
+            refs.push(r);
             self.db.insert(
                 format!("b:{}", bucket),
-                bincode::encode_to_vec(&refs, CONFIG.clone()).unwrap(),
+                bincode::encode_to_vec(refs, *CONFIG).unwrap(),
             )?;
         };
         Ok(())

@@ -64,12 +64,12 @@ where
         match indexer.get_ref_by_name(name.clone()) {
             Ok(blobref) => Ok(blobref),
             Err(_) => {
-                let blobref = Ref::new(name.clone(), size, vec![hash]);
+                let blobref = Ref::new(name, size, vec![hash]);
                 indexer.put_ref(blobref.clone())?;
 
-                if let None = self.blobstore.get(hash) {
+                if self.blobstore.get(hash).is_none() {
                     self.blobstore.put(blob.clone())?;
-                    self.blobcache.put(blob.clone())?;
+                    self.blobcache.put(blob)?;
                 }
 
                 Ok(blobref)

@@ -21,12 +21,12 @@ impl Ref {
     }
 
     pub fn from_vec(arr: &[u8]) -> Result<Vec<Ref>> {
-        let (rref, _): (Vec<Ref>, usize) = bincode::decode_from_slice(&arr, CONFIG.clone())?;
+        let (rref, _): (Vec<Ref>, usize) = bincode::decode_from_slice(arr, *CONFIG)?;
         Ok(rref)
     }
 
     pub fn from_slice(arr: &[u8]) -> Result<Ref> {
-        let (rref, _): (Ref, usize) = bincode::decode_from_slice(&arr, CONFIG.clone())?;
+        let (rref, _): (Ref, usize) = bincode::decode_from_slice(arr, *CONFIG)?;
         Ok(rref)
     }
 }
