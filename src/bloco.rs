@@ -1,10 +1,10 @@
 use crate::{
     indexer::{Indexer, SledIndexer},
     store::Store,
-    Blob, CachedFileStore, Core, EncryptedStore, Hash, Ref, Result,
+    Blob, CachedStore, Core, EncryptedStore, FileStore, Hash, Ref, Result,
 };
 
-pub type Default<const N: usize> = Bloco<EncryptedStore<CachedFileStore<N>>, SledIndexer>;
+pub type Default<const N: usize> = Bloco<EncryptedStore<CachedStore<FileStore, N>>, SledIndexer>;
 
 #[derive(Debug, Clone)]
 pub struct Bloco<S, I> {
@@ -24,7 +24,9 @@ where
     pub fn from_dir(secret: String, dir: String) -> Default<100> {
         let blobsdir = format!("{}/blobs", dir);
         let sleddir = format!("{}/sled", dir);
-        let store = EncryptedStore::new(secret, CachedFileStore::new(blobsdir));
+        let fs = FileStore::new(blobsdir);
+        let cached = CachedStore::new(fs);
+        let store = EncryptedStore::new(secret, cached);
         let indexer = SledIndexer::new(sleddir);
         Bloco::new(store, indexer)
     }

@@ -1,5 +1,5 @@
 pub mod btree;
-pub mod cachedfile;
+pub mod cached;
 pub mod encrypted;
 pub mod file;
 pub mod lru;

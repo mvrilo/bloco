@@ -17,7 +17,7 @@ pub use crate::indexer::Indexer;
 pub use crate::indexer::SledIndexer;
 
 pub use crate::store::btree::BTreeStore;
-pub use crate::store::cachedfile::CachedFileStore;
+pub use crate::store::cached::CachedStore;
 pub use crate::store::encrypted::EncryptedStore;
 pub use crate::store::file::FileStore;
 pub use crate::store::lru::LRUStore;
