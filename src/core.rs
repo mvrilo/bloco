@@ -1,10 +1,10 @@
-use crate::{Blob, Hash, Ref, Result};
+use crate::{Blob, FileRef, Result};
 
 pub trait Core {
-    fn get_blob(&mut self, hash: Hash) -> Result<Blob>;
-    fn get_ref_by_name(&mut self, name: String) -> Result<Ref>;
-    fn get_ref_by_name_and_bucket(&mut self, name: String, bucket: String) -> Result<Ref>;
+    // fn get_blob(&mut self, hash: Hash) -> Result<Blob>;
+    fn get_fileref_by_name(&mut self, name: String) -> Result<FileRef>;
+    fn get_fileref_by_name_and_bucket(&mut self, name: String, bucket: String) -> Result<FileRef>;
 
-    fn put_data(&mut self, data: Vec<u8>, name: String) -> Result<Ref>;
-    fn put_ref_in(&mut self, rr: Ref, bucket: String) -> Result<Ref>;
+    fn put(&mut self, blob: Blob, name: String) -> Result<FileRef>;
+    fn put_fileref(&mut self, rr: FileRef, bucket: Option<String>) -> Result<FileRef>;
 }

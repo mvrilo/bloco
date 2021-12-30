@@ -2,15 +2,16 @@ pub mod blob;
 pub mod bloco;
 pub mod core;
 pub mod error;
+pub mod fileref;
 pub mod hash;
 pub mod indexer;
 pub mod store;
 
 pub use crate::blob::Blob;
-pub use crate::blob::Ref;
 pub use crate::bloco::{Bloco, Default};
 pub use crate::core::Core;
 pub use crate::error::Error;
+pub use crate::fileref::FileRef;
 pub use crate::hash::Hash;
 
 pub use crate::indexer::Indexer;

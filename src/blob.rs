@@ -1,35 +1,7 @@
-use crate::{Hash, Result};
-use bincode::{config::Configuration, Decode, Encode};
-use lazy_static::lazy_static;
+use crate::Hash;
+use bincode::{Decode, Encode};
 use std::fs;
 use std::io::Read;
-
-lazy_static! {
-    static ref CONFIG: Configuration = Configuration::standard();
-}
-
-#[derive(Debug, Clone, Encode, Decode, PartialEq)]
-pub struct Ref {
-    pub name: String,
-    pub size: u64,
-    pub blobs: Vec<Hash>,
-}
-
-impl Ref {
-    pub fn new(name: String, size: u64, blobs: Vec<Hash>) -> Self {
-        Ref { name, blobs, size }
-    }
-
-    pub fn from_vec(arr: &[u8]) -> Result<Vec<Ref>> {
-        let (rref, _): (Vec<Ref>, usize) = bincode::decode_from_slice(arr, *CONFIG)?;
-        Ok(rref)
-    }
-
-    pub fn from_slice(arr: &[u8]) -> Result<Ref> {
-        let (rref, _): (Ref, usize) = bincode::decode_from_slice(arr, *CONFIG)?;
-        Ok(rref)
-    }
-}
 
 #[derive(Debug, Clone, Encode, Decode, PartialEq)]
 pub struct Blob(pub Vec<u8>);
@@ -41,6 +13,10 @@ impl Blob {
 
     pub fn hash(&self) -> Hash {
         blake3::hash(&self.0).into()
+    }
+
+    pub fn size(&self) -> usize {
+        self.0.len()
     }
 }
 
