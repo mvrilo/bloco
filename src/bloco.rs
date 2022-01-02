@@ -1,10 +1,11 @@
 use crate::{
-    indexer::{Indexer, SledIndexer},
+    indexer::{FileRefIndexer, SqliteIndexer},
     store::Store,
-    Blob, CachedStore, Core, EncryptedStore, FileRef, FileStore, Result,
+    Blob, CachedStore, Core, EncryptedStore, FileRef, FileStore, LRUStore, Result,
 };
+use async_trait::async_trait;
 
-pub type Default<const N: usize> = Bloco<EncryptedStore<CachedStore<FileStore, N>>, SledIndexer>;
+pub type Default<const N: usize> = Bloco<EncryptedStore<CachedStore<FileStore, N>>, SqliteIndexer>;
 
 #[derive(Debug, Clone)]
 pub struct Bloco<S, I> {
@@ -15,72 +16,71 @@ pub struct Bloco<S, I> {
 impl<S, I> Bloco<S, I>
 where
     S: Store,
-    I: Indexer,
+    I: FileRefIndexer,
 {
     pub fn new(store: S, indexer: I) -> Bloco<S, I> {
         Bloco { store, indexer }
     }
 
-    pub fn from_dir(secret: String, dir: String) -> Default<100> {
+    pub async fn from(secret: String, dir: String) -> Result<Default<100>> {
+        Ok(Self::from_encrypted_cached_dir(secret, dir).await?)
+    }
+
+    pub async fn from_encrypted_cached_dir(secret: String, dir: String) -> Result<Default<100>> {
         let blobsdir = format!("{}/blobs", dir);
-        let sleddir = format!("{}/sled", dir);
         let fs = FileStore::new(blobsdir);
         let cached = CachedStore::new(fs);
         let store = EncryptedStore::new(secret, cached);
-        let indexer = SledIndexer::new(sleddir);
-        Bloco::new(store, indexer)
+        let indexer = SqliteIndexer::from_dir(dir, "index.db".into()).await?;
+        Ok(Bloco::new(store, indexer))
+    }
+
+    pub async fn from_cached_dir(
+        dir: String,
+    ) -> Result<Bloco<CachedStore<FileStore, 100>, SqliteIndexer>> {
+        let blobsdir = format!("{}/blobs", dir);
+        let fs = FileStore::new(blobsdir);
+        let cached = CachedStore::new(fs);
+        let indexer = SqliteIndexer::from_dir(dir, "index.db".into()).await?;
+        Ok(Bloco::new(cached, indexer))
+    }
+
+    pub async fn from_memory(
+        secret: String,
+    ) -> Result<Bloco<EncryptedStore<LRUStore<100>>, SqliteIndexer>> {
+        let fs = LRUStore::default();
+        let store = EncryptedStore::new(secret, fs);
+        let indexer = SqliteIndexer::from_memory().await?;
+        Ok(Bloco::new(store, indexer))
     }
 }
 
+#[async_trait]
 impl<S, I> Core for Bloco<S, I>
 where
     S: Store,
-    I: Indexer,
+    I: FileRefIndexer,
 {
-    // fn get_blob(&mut self, hash: Hash) -> Result<Blob> {
-    //     Ok(self.store.get(hash).unwrap())
-    // }
-
-    fn get_fileref_by_name(&mut self, name: String) -> Result<FileRef> {
-        self.indexer.get_fileref_by_name(name)
+    async fn get_filerefs_by_name(&mut self, name: String) -> Result<Vec<FileRef>> {
+        Ok(self.indexer.get_by_name(name).await?)
     }
 
-    fn get_fileref_by_name_and_bucket(&mut self, name: String, bucket: String) -> Result<FileRef> {
-        self.indexer.get_fileref_by_name_and_bucket(name, bucket)
-    }
-
-    fn put_fileref(&mut self, fr: FileRef, bucket: Option<String>) -> Result<FileRef> {
-        self.indexer.put_fileref(fr.clone(), bucket)?;
-        Ok(fr)
-    }
-
-    fn put(&mut self, blob: Blob, name: String) -> Result<FileRef> {
-        let size = blob.size() as u64;
+    async fn put(&mut self, name: String, blob: &Blob) -> Result<FileRef> {
         let mut newblob: Blob = blob.clone();
-        let orig_hash = blob.hash();
-        let indexer = &mut self.indexer;
+        let hash = blob.hash();
+        if let Err(_) = self.store.get(hash).await {
+            self.store.put(&mut newblob).await?;
+        };
 
-        self.store.put(&mut newblob)?;
-        let hash = newblob.hash();
-
-        let blobref: FileRef = indexer
-            .get_fileref_by_name(name.clone())
-            .or(Ok(FileRef::new(name, size, orig_hash, vec![hash])) as Result<FileRef>)?;
-        indexer.put_fileref(blobref.clone(), None)?;
-        Ok(blobref)
+        let fileref = FileRef::new(name, blob.size() as i64, hash);
+        self.indexer.put(&fileref).await?;
+        Ok(fileref)
     }
 }
 
 #[cfg(test)]
 pub mod test {
     use super::*;
-
-    fn bloco() -> Default<100> {
-        Default::<100>::from_dir(
-            "36c0dbde383816cb498c07f8ae615371".into(),
-            "/tmp/bloco-cargo-test".into(),
-        )
-    }
 
     fn remove_dir() {
         #[allow(unused_must_use)]
@@ -89,50 +89,39 @@ pub mod test {
         }
     }
 
-    fn sample_data() -> Blob {
-        b"hey".to_vec().into()
-    }
-
-    #[test]
-    fn test_put() {
+    #[tokio::test]
+    async fn test_put() {
         remove_dir();
-        let mut bloco = bloco();
-        let ref1 = bloco.put(sample_data(), "a.txt".into()).unwrap();
+
+        let bloco = &mut Bloco::<LRUStore<100>, SqliteIndexer>::from_memory(
+            "36c0dbde383816cb498c07f8ae615371".into(),
+        )
+        .await
+        .unwrap();
+
+        let blob: Blob = b"hey".to_vec().into();
+        let ref1 = bloco.put("a.txt".into(), &blob).await.unwrap();
         assert_eq!(ref1.name, "a.txt");
-        assert_eq!(ref1.hashes.len(), 1);
+        assert_eq!(ref1.hash, blob.hash().as_hex());
     }
 
-    #[test]
-    fn test_get_data() {
+    #[tokio::test]
+    async fn test_get_filerefs_by_name() {
         remove_dir();
-        let mut bloco = bloco();
-        let blob = sample_data();
-        let orig_hash = blob.hash();
-        let _ = bloco.put(blob, "a.txt".into()).unwrap();
 
-        let ref1 = bloco.indexer.get_fileref_by_name("a.txt".into()).unwrap();
-        assert_eq!(ref1.hashes.len(), 1);
-        assert_eq!(ref1.orig_hash, orig_hash);
-        assert_ne!(ref1.orig_hash, ref1.hashes[0]);
+        let bloco = &mut Bloco::<LRUStore<100>, SqliteIndexer>::from_memory(
+            "36c0dbde383816cb498c07f8ae615371".into(),
+        )
+        .await
+        .unwrap();
 
-        let ref2 = bloco.get_fileref_by_name_and_bucket("a.txt".into(), "/".into());
-        assert!(ref2.is_err());
+        let blob: Blob = b"hey".to_vec().into();
+        let ref1 = bloco.put("a.txt".into(), &blob).await;
+        assert!(ref1.is_ok());
 
-        // let blob = bloco.get_blob(ref1.hashes[0]).unwrap();
-        // assert_eq!(blob.0, b"hey")
-    }
-
-    #[test]
-    fn test_put_bucket_data() {
-        remove_dir();
-        let mut bloco = bloco();
-        let ref1 = bloco.put(sample_data(), "a.txt".into()).unwrap();
-        bloco.put_fileref(ref1, Some("/".into())).unwrap();
-
-        let ref2 = bloco.get_fileref_by_name_and_bucket("a.txt".into(), "/".into());
-        assert!(ref2.is_ok());
-
-        let ref3 = bloco.get_fileref_by_name_and_bucket("a.txt".into(), "/nope".into());
-        assert!(ref3.is_err());
+        let ref2 = bloco.get_filerefs_by_name("a.txt".into()).await.unwrap();
+        assert_eq!(ref2.len(), 1);
+        assert_eq!(ref2[0].name, "a.txt");
+        assert_eq!(ref2[0].hash, blob.hash().as_hex());
     }
 }

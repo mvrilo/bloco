@@ -1,4 +1,5 @@
 use crate::{Blob, Hash, Result, Store};
+use async_trait::async_trait;
 use std::fs;
 use std::io::prelude::*;
 use std::path::Path;
@@ -15,20 +16,19 @@ impl FileStore {
     }
 }
 
+#[async_trait]
 impl Store for FileStore {
-    fn get(&mut self, hash: Hash) -> Option<Blob> {
+    async fn get(&mut self, hash: Hash) -> Result<Blob> {
         let name = String::from_utf8_lossy(&hash.0).into_owned();
         let path = Path::new(&self.dir).join(&name);
-        match fs::File::open(path) {
-            Ok(f) => Some(f.into()),
-            Err(_) => None,
-        }
+        Ok(fs::File::open(path)?.into())
     }
 
-    fn put(&mut self, blob: &mut Blob) -> Result<()> {
-        let path = Path::new(&self.dir).join(blob.hash().as_hex());
+    async fn put(&mut self, blob: &mut Blob) -> Result<Hash> {
+        let hash = blob.hash();
+        let path = Path::new(&self.dir).join(hash.as_hex());
         let mut file = fs::File::create(path)?;
         file.write_all(&blob.0)?;
-        Ok(())
+        Ok(hash)
     }
 }

@@ -1,13 +1,13 @@
-use crate::{FileRef, Result};
+use crate::{FileRef, Hash, Result};
+use async_trait::async_trait;
 
-pub mod sled;
+pub mod sqlite;
 
-pub use crate::indexer::sled::SledIndexer;
+pub use crate::indexer::sqlite::SqliteIndexer;
 
-pub trait Indexer: Clone {
-    fn put_fileref(&mut self, r: FileRef, bucket: Option<String>) -> Result<()>;
-
-    fn get_filerefs_from(&mut self, bucket: String) -> Result<Vec<FileRef>>;
-    fn get_fileref_by_name(&mut self, name: String) -> Result<FileRef>;
-    fn get_fileref_by_name_and_bucket(&mut self, name: String, bucket: String) -> Result<FileRef>;
+#[async_trait]
+pub trait FileRefIndexer: Sync + Send + Clone {
+    async fn put(&self, fr: &FileRef) -> Result<()>;
+    async fn get_by_name(&self, name: String) -> Result<Vec<FileRef>>;
+    async fn get_by_hash(&self, hash: Hash) -> Result<Vec<FileRef>>;
 }

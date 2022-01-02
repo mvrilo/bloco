@@ -1,9 +1,8 @@
 use crate::Hash;
-use bincode::{Decode, Encode};
 use std::fs;
 use std::io::Read;
 
-#[derive(Debug, Clone, Encode, Decode, PartialEq)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct Blob(pub Vec<u8>);
 
 impl Blob {

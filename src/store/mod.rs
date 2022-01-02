@@ -1,4 +1,5 @@
-pub mod btree;
+use async_trait::async_trait;
+
 pub mod cached;
 pub mod encrypted;
 pub mod file;
@@ -6,7 +7,8 @@ pub mod lru;
 
 use crate::{Blob, Hash, Result};
 
-pub trait Store: Clone {
-    fn get(&mut self, hash: Hash) -> Option<Blob>;
-    fn put(&mut self, blob: &mut Blob) -> Result<()>;
+#[async_trait]
+pub trait Store: Sync + Send + Clone {
+    async fn get(&mut self, hash: Hash) -> Result<Blob>;
+    async fn put(&mut self, blob: &mut Blob) -> Result<Hash>;
 }

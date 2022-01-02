@@ -1,6 +1,4 @@
-use bincode::{Decode, Encode};
-
-#[derive(Clone, Copy, Encode, Decode, Debug, Default, PartialEq, Eq, Ord, PartialOrd)]
+#[derive(Clone, Copy, PartialEq)]
 pub struct Hash(pub [u8; 32]);
 
 impl Hash {

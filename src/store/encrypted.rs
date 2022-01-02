@@ -1,4 +1,5 @@
 use crate::{Blob, Hash, Result, Store};
+use async_trait::async_trait;
 use orion::aead;
 
 #[derive(Debug, Clone, Default)]
@@ -20,22 +21,22 @@ where
     }
 }
 
+#[async_trait]
 impl<S> Store for EncryptedStore<S>
 where
     S: Store,
 {
-    fn get(&mut self, hash: Hash) -> Option<Blob> {
+    async fn get(&mut self, hash: Hash) -> Result<Blob> {
         let secret = self.secret();
         self.store
             .get(hash)
-            .map(|b| Some(Blob::new(aead::open(&secret, &b.0).unwrap())))
-            .unwrap()
+            .await
+            .map(|b| Blob::new(aead::open(&secret, &b.0).unwrap()))
     }
 
-    fn put(&mut self, blob: &mut Blob) -> Result<()> {
+    async fn put(&mut self, blob: &mut Blob) -> Result<Hash> {
         let secret = self.secret();
         blob.0 = aead::seal(&secret, &blob.0).unwrap();
-        self.store.put(blob).unwrap();
-        Ok(())
+        Ok(self.store.put(blob).await?)
     }
 }

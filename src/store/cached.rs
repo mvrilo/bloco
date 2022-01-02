@@ -1,5 +1,6 @@
 use crate::LRUStore;
 use crate::{Blob, Hash, Result, Store};
+use async_trait::async_trait;
 
 #[derive(Debug, Clone)]
 pub struct CachedStore<S: Store, const N: usize> {
@@ -19,17 +20,18 @@ where
     }
 }
 
+#[async_trait]
 impl<S, const N: usize> Store for CachedStore<S, N>
 where
     S: Store,
 {
-    fn get(&mut self, hash: Hash) -> Option<Blob> {
-        self.cache.get(hash).or_else(|| self.store.get(hash))
+    async fn get(&mut self, hash: Hash) -> Result<Blob> {
+        self.cache.get(hash).await.or(self.store.get(hash).await)
     }
 
-    fn put(&mut self, blob: &mut Blob) -> Result<()> {
-        self.store.put(blob)?;
-        self.cache.put(blob)?;
-        Ok(())
+    async fn put(&mut self, blob: &mut Blob) -> Result<Hash> {
+        self.store.put(blob).await?;
+        self.cache.put(blob).await?;
+        Ok(blob.hash())
     }
 }
