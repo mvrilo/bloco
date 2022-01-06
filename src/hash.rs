@@ -11,6 +11,12 @@ impl Hash {
     }
 }
 
+impl From<String> for Hash {
+    fn from(data: String) -> Hash {
+        hex::decode(data).unwrap().into()
+    }
+}
+
 impl From<[u8; 32]> for Hash {
     fn from(arr: [u8; 32]) -> Hash {
         Hash(arr)

@@ -1,5 +1,6 @@
 use crate::{Blob, Hash, Result, Store};
 use async_trait::async_trait;
+use bytes::{buf::BufMut, BytesMut};
 use orion::aead;
 
 #[derive(Debug, Clone, Default)]
@@ -28,15 +29,20 @@ where
 {
     async fn get(&mut self, hash: Hash) -> Result<Blob> {
         let secret = self.secret();
-        self.store
-            .get(hash)
-            .await
-            .map(|b| Blob::new(aead::open(&secret, &b.0).unwrap()))
+        self.store.get(hash).await.map(|b| {
+            let buf = &mut BytesMut::new();
+            let sealed = aead::seal(&secret, &b.0).unwrap();
+            buf.put(&*sealed);
+            buf.clone().into()
+        })
     }
 
     async fn put(&mut self, blob: &mut Blob) -> Result<Hash> {
         let secret = self.secret();
-        blob.0 = aead::seal(&secret, &blob.0).unwrap();
-        Ok(self.store.put(blob).await?)
+        let buf = &mut BytesMut::new();
+        let sealed = aead::seal(&secret, &blob.0)?;
+        buf.put(&*sealed);
+        blob.0 = buf.clone();
+        Ok(self.store.put(blob.into()).await?)
     }
 }

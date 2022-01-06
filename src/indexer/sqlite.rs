@@ -1,4 +1,7 @@
-use crate::{indexer::FileRefIndexer, FileRef, Hash, Result};
+use crate::{
+    indexer::{ChunkIndexer, FileRefIndexer},
+    Chunk, FileRef, Hash, Result,
+};
 use async_trait::async_trait;
 use sqlx::{
     sqlite::{SqliteConnectOptions, SqliteJournalMode, SqlitePool},
@@ -10,7 +13,8 @@ use std::sync::Arc;
 const STMT_CREATE_TABLES: &'static str = "
 BEGIN TRANSACTION;
 CREATE TABLE IF NOT EXISTS hashes (id primary key, hash text, hash_id integer);
-CREATE TABLE IF NOT EXISTS filerefs (id primary key, name text, size integer default 0, hash text not null, created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP );
+CREATE TABLE IF NOT EXISTS filerefs (id primary key, name text, size integer default 0, hash text not null, created_at timestamp default current_timestamp );
+CREATE TABLE IF NOT EXISTS chunks (id primary key, origin text not null, hash text not null);
 COMMIT;
 ";
 
@@ -23,6 +27,10 @@ const STMT_SELECT_FILEREFS_HASH: &'static str = "SELECT * FROM filerefs WHERE ha
 
 const STMT_INSERT_FILEREF: &'static str =
     "INSERT INTO filerefs (name, size, hash) VALUES (?, ?, ?)";
+
+const STMT_INSERT_CHUNK: &'static str = "INSERT INTO chunks (origin, hash) VALUES (?, ?)";
+
+const STMT_SELECT_CHUNKS: &'static str = "SELECT hash FROM chunks WHERE origin = ?";
 
 #[derive(sqlx::Decode, sqlx::Encode, Debug, Clone, Copy, FromRow)]
 pub struct Id(i64);
@@ -101,6 +109,25 @@ impl FileRefIndexer for SqliteIndexer {
     async fn get_by_hash(&self, hash: Hash) -> Result<Vec<FileRef>> {
         Ok(sqlx::query_as(STMT_SELECT_FILEREFS_HASH)
             .bind(hash.as_hex())
+            .fetch_all(self.conn())
+            .await?)
+    }
+}
+
+#[async_trait]
+impl ChunkIndexer for SqliteIndexer {
+    async fn put_chunk(&self, origin: Hash, chunk: Hash) -> Result<()> {
+        sqlx::query(STMT_INSERT_CHUNK)
+            .bind(origin.as_hex())
+            .bind(chunk.as_hex())
+            .execute(self.conn())
+            .await?;
+        Ok(())
+    }
+
+    async fn get_chunks(&self, origin: Hash) -> Result<Vec<Chunk>> {
+        Ok(sqlx::query_as(STMT_SELECT_CHUNKS)
+            .bind(origin.as_hex())
             .fetch_all(self.conn())
             .await?)
     }
